@@ -1,0 +1,74 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- base dark ring -->
+    <path
+        android:pathData="M15,50 A35,35 0 1 1 85,50 A35,35 0 1 1 15,50 Z"
+        android:strokeWidth="13"
+        android:strokeColor="#23103E"
+        android:fillColor="#00000000" />
+
+    <!-- gradient ring -->
+    <path
+        android:pathData="M15,50 A35,35 0 1 1 85,50 A35,35 0 1 1 15,50 Z"
+        android:strokeWidth="7"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="12" android:startY="28"
+                android:endX="92" android:endY="74">
+                <item android:offset="0" android:color="#EC4899" />
+                <item android:offset="0.38" android:color="#A855F7" />
+                <item android:offset="0.7" android:color="#7C5CF6" />
+                <item android:offset="1" android:color="#3B82F6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- left ear cup -->
+    <group android:pivotX="22" android:pivotY="69" android:rotation="14">
+        <path
+            android:pathData="M21,50 h12 a10,10 0 0 1 10,10 v18 a10,10 0 0 1 -10,10 h-12 a10,10 0 0 1 -10,-10 v-18 a10,10 0 0 1 10,-10 z"
+            android:strokeWidth="5"
+            android:strokeColor="#23103E">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="11" android:startY="50" android:endX="33" android:endY="88">
+                    <item android:offset="0" android:color="#F97316" />
+                    <item android:offset="0.5" android:color="#EF3D6D" />
+                    <item android:offset="1" android:color="#9333EA" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+
+    <!-- right ear cup -->
+    <group android:pivotX="78" android:pivotY="69" android:rotation="-14">
+        <path
+            android:pathData="M77,50 h-12 a10,10 0 0 0 -10,10 v18 a10,10 0 0 0 10,10 h12 a10,10 0 0 0 10,-10 v-18 a10,10 0 0 0 -10,-10 z"
+            android:strokeWidth="5"
+            android:strokeColor="#23103E">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="67" android:startY="50" android:endX="89" android:endY="88">
+                    <item android:offset="0" android:color="#EC4899" />
+                    <item android:offset="0.5" android:color="#8B5CF6" />
+                    <item android:offset="1" android:color="#3B82F6" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+
+    <!-- play triangle -->
+    <path
+        android:pathData="M39,33 L67,50 L39,67 Z"
+        android:strokeWidth="7"
+        android:strokeColor="#F5F1F2"
+        android:strokeLineJoin="round"
+        android:fillColor="#F5F1F2" />
+</vector>
