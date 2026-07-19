@@ -79,4 +79,55 @@ data class Library(
     fun tracksFor(ids: List<Long>): List<Track> = ids.mapNotNull { byId[it] }
 
     val isEmpty: Boolean get() = tracks.isEmpty()
+
+    /**
+     * A copy of this library with tracks in [hiddenFolders] or with an id in
+     * [hiddenTrackIds] removed, and its albums/artists rebuilt so they never
+     * reference filtered-out tracks. Discovery still finds everything; this is
+     * only the user's "don't show me these" view.
+     */
+    fun filtered(hiddenFolders: Set<String>, hiddenTrackIds: Set<Long>): Library {
+        if (hiddenFolders.isEmpty() && hiddenTrackIds.isEmpty()) return this
+        val kept = tracks.filter { it.folder !in hiddenFolders && it.id !in hiddenTrackIds }
+        if (kept.size == tracks.size) return this
+        return buildLibrary(kept)
+    }
 }
+
+/** Aggregates a flat list of [Track]s into a full [Library] (albums + artists). */
+fun buildLibrary(tracks: List<Track>): Library =
+    Library(tracks = tracks, albums = buildAlbums(tracks), artists = buildArtists(tracks))
+
+private fun buildAlbums(tracks: List<Track>): List<Album> =
+    tracks.groupBy { it.albumId }
+        .map { (albumId, group) ->
+            val ordered = group.sortedWith(
+                compareBy({ it.trackNumber == 0 }, { it.trackNumber }, { it.title })
+            )
+            val head = group.first()
+            Album(
+                id = albumId,
+                title = head.album,
+                artist = group.dominantArtist(),
+                year = group.maxOf { it.year },
+                trackCount = group.size,
+                albumArtUri = head.albumArtUri,
+                trackIds = ordered.map { it.id },
+            )
+        }
+        .sortedBy { it.title.lowercase() }
+
+private fun buildArtists(tracks: List<Track>): List<Artist> =
+    tracks.groupBy { it.artistId }
+        .map { (artistId, group) ->
+            Artist(
+                id = artistId,
+                name = group.dominantArtist(),
+                albumCount = group.map { it.albumId }.distinct().size,
+                trackCount = group.size,
+            )
+        }
+        .sortedBy { it.name.lowercase() }
+
+private fun List<Track>.dominantArtist(): String =
+    groupingBy { it.artist }.eachCount().maxByOrNull { it.value }?.key ?: "Unknown artist"

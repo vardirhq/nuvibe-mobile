@@ -22,6 +22,7 @@ import dev.nuvibe.player.playback.PlayerController
 import dev.nuvibe.player.playback.PlayerUiState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,9 +34,24 @@ class NuvibeViewModel(
     private val player: PlayerController,
 ) : ViewModel() {
 
-    val library: StateFlow<Library> = musicRepository.library
+    /** The full on-device library, before the user's hide filters are applied. */
+    val rawLibrary: StateFlow<Library> = musicRepository.library
     val scanState: StateFlow<ScanState> = musicRepository.scanState
     val playerState: StateFlow<PlayerUiState> = player.state
+
+    val hiddenFolders: StateFlow<Set<String>> = settingsRepository.hiddenFolders
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    val hiddenTrackIds: StateFlow<Set<Long>> = settingsRepository.hiddenTrackIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** The library the rest of the app browses: discovery minus the user's hides. */
+    val library: StateFlow<Library> = combine(
+        musicRepository.library,
+        settingsRepository.hiddenFolders,
+        settingsRepository.hiddenTrackIds,
+    ) { lib, folders, trackIds -> lib.filtered(folders, trackIds) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Library())
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
@@ -111,6 +127,12 @@ class NuvibeViewModel(
     fun setSkipSilence(v: Boolean) = viewModelScope.launch { settingsRepository.setSkipSilence(v) }
     fun setPauseOnDisconnect(v: Boolean) = viewModelScope.launch { settingsRepository.setPauseOnDisconnect(v) }
     fun setHandleAudioFocus(v: Boolean) = viewModelScope.launch { settingsRepository.setHandleAudioFocus(v) }
+
+    fun setFolderHidden(path: String, hidden: Boolean) =
+        viewModelScope.launch { settingsRepository.setFolderHidden(path, hidden) }
+
+    fun setTrackHidden(trackId: Long, hidden: Boolean) =
+        viewModelScope.launch { settingsRepository.setTrackHidden(trackId, hidden) }
 
     // ---- playlists --------------------------------------------------------
 

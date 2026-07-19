@@ -4,10 +4,9 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
-import dev.nuvibe.player.data.model.Album
-import dev.nuvibe.player.data.model.Artist
 import dev.nuvibe.player.data.model.Library
 import dev.nuvibe.player.data.model.Track
+import dev.nuvibe.player.data.model.buildLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,10 +19,7 @@ class MediaStoreScanner(private val context: Context) {
     private val albumArtBase: Uri = Uri.parse("content://media/external/audio/albumart")
 
     suspend fun scan(): Library = withContext(Dispatchers.IO) {
-        val tracks = queryTracks()
-        val albums = buildAlbums(tracks)
-        val artists = buildArtists(tracks)
-        Library(tracks = tracks, albums = albums, artists = artists)
+        buildLibrary(queryTracks())
     }
 
     private fun queryTracks(): List<Track> {
@@ -89,40 +85,6 @@ class MediaStoreScanner(private val context: Context) {
         }
         return out
     }
-
-    private fun buildAlbums(tracks: List<Track>): List<Album> =
-        tracks.groupBy { it.albumId }
-            .map { (albumId, group) ->
-                val ordered = group.sortedWith(
-                    compareBy({ it.trackNumber == 0 }, { it.trackNumber }, { it.title })
-                )
-                val head = group.first()
-                Album(
-                    id = albumId,
-                    title = head.album,
-                    artist = group.dominantArtist(),
-                    year = group.maxOf { it.year },
-                    trackCount = group.size,
-                    albumArtUri = head.albumArtUri,
-                    trackIds = ordered.map { it.id },
-                )
-            }
-            .sortedBy { it.title.lowercase() }
-
-    private fun buildArtists(tracks: List<Track>): List<Artist> =
-        tracks.groupBy { it.artistId }
-            .map { (artistId, group) ->
-                Artist(
-                    id = artistId,
-                    name = group.dominantArtist(),
-                    albumCount = group.map { it.albumId }.distinct().size,
-                    trackCount = group.size,
-                )
-            }
-            .sortedBy { it.name.lowercase() }
-
-    private fun List<Track>.dominantArtist(): String =
-        groupingBy { it.artist }.eachCount().maxByOrNull { it.value }?.key ?: "Unknown artist"
 
     /** MediaStore uses "<unknown>" / blank for missing tags. */
     private fun String?.clean(fallback: String): String =

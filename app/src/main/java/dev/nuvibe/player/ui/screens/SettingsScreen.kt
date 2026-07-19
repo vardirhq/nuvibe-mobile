@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.nuvibe.player.data.model.Track
 import dev.nuvibe.player.data.settings.AccentColor
 import dev.nuvibe.player.data.settings.AppSettings
 import dev.nuvibe.player.data.settings.ThemeMode
@@ -67,16 +69,21 @@ fun SettingsScreen(
     songCount: Int,
     isScanning: Boolean,
     folders: List<Pair<String, Int>>,
+    hiddenFolders: Set<String>,
+    hiddenTracks: List<Track>,
     onSetTheme: (ThemeMode) -> Unit,
     onSetAccent: (AccentColor) -> Unit,
     onSetSkipSilence: (Boolean) -> Unit,
     onSetPauseOnDisconnect: (Boolean) -> Unit,
     onSetHandleAudioFocus: (Boolean) -> Unit,
+    onSetFolderHidden: (String, Boolean) -> Unit,
+    onUnhideTrack: (Long) -> Unit,
     onRescan: () -> Unit,
 ) {
     val colors = NuvibeTheme.colors
     val context = LocalContext.current
     var showFolders by remember { mutableStateOf(false) }
+    var showHidden by remember { mutableStateOf(false) }
     val dark = settings.themeMode == ThemeMode.DARK
 
     Column(
@@ -191,15 +198,39 @@ fun SettingsScreen(
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Music folders", color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    val hiddenCount = folders.count { it.first in hiddenFolders }
                     Text(
-                        when (folders.size) {
-                            0 -> "No folders indexed yet"
-                            1 -> "1 folder · tap to view"
-                            else -> "${folders.size} folders · tap to view"
+                        when {
+                            folders.isEmpty() -> "No folders indexed yet"
+                            hiddenCount > 0 -> "${folders.size} folders · $hiddenCount hidden · tap to manage"
+                            folders.size == 1 -> "1 folder · tap to manage"
+                            else -> "${folders.size} folders · tap to manage"
                         },
                         color = colors.text2,
                         fontSize = 12.sp,
                     )
+                }
+            }
+            if (hiddenTracks.isNotEmpty()) {
+                Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(colors.border))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickableNoRipple { showHidden = true }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.VisibilityOff, null, tint = colors.text2, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Hidden tracks", color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (hiddenTracks.size == 1) "1 track hidden · tap to manage"
+                            else "${hiddenTracks.size} tracks hidden · tap to manage",
+                            color = colors.text2,
+                            fontSize = 12.sp,
+                        )
+                    }
                 }
             }
         }
@@ -218,12 +249,30 @@ fun SettingsScreen(
     }
 
     if (showFolders) {
-        FoldersDialog(folders = folders, onDismiss = { showFolders = false })
+        FoldersDialog(
+            folders = folders,
+            hiddenFolders = hiddenFolders,
+            onSetFolderHidden = onSetFolderHidden,
+            onDismiss = { showFolders = false },
+        )
+    }
+
+    if (showHidden) {
+        HiddenTracksDialog(
+            tracks = hiddenTracks,
+            onUnhide = onUnhideTrack,
+            onDismiss = { showHidden = false },
+        )
     }
 }
 
 @Composable
-private fun FoldersDialog(folders: List<Pair<String, Int>>, onDismiss: () -> Unit) {
+private fun FoldersDialog(
+    folders: List<Pair<String, Int>>,
+    hiddenFolders: Set<String>,
+    onSetFolderHidden: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val colors = NuvibeTheme.colors
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -232,10 +281,17 @@ private fun FoldersDialog(folders: List<Pair<String, Int>>, onDismiss: () -> Uni
         text = {
             Column(
                 Modifier
-                    .heightIn(max = 360.dp)
+                    .heightIn(max = 400.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
+                Text(
+                    "Turn a folder off to hide its tracks from your library. Discovery still finds them — nothing is deleted.",
+                    color = colors.text3,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
                 folders.forEach { (path, count) ->
+                    val hidden = path in hiddenFolders
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -247,14 +303,14 @@ private fun FoldersDialog(folders: List<Pair<String, Int>>, onDismiss: () -> Uni
                         Column(Modifier.weight(1f)) {
                             Text(
                                 path.substringAfterLast('/').ifBlank { path },
-                                color = colors.text,
+                                color = if (hidden) colors.text3 else colors.text,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                prettyPath(path),
+                                "${prettyPath(path)} · $count",
                                 color = colors.text3,
                                 fontSize = 11.5.sp,
                                 maxLines = 1,
@@ -262,7 +318,60 @@ private fun FoldersDialog(folders: List<Pair<String, Int>>, onDismiss: () -> Uni
                             )
                         }
                         Spacer(Modifier.width(10.dp))
-                        Text("$count", color = colors.text2, fontSize = 13.sp)
+                        NuvibeToggle(checked = !hidden) { onSetFolderHidden(path, !hidden) }
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun HiddenTracksDialog(
+    tracks: List<Track>,
+    onUnhide: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = NuvibeTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Hidden tracks") },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (tracks.isEmpty()) {
+                    Text("No hidden tracks.", color = colors.text3, fontSize = 13.sp)
+                }
+                tracks.forEach { track ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                track.title,
+                                color = colors.text,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                "${track.artist} · ${track.album}",
+                                color = colors.text3,
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        TextButton(onClick = { onUnhide(track.id) }) { Text("Unhide") }
                     }
                 }
             }
