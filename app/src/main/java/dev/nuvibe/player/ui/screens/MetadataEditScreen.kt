@@ -67,7 +67,6 @@ import kotlinx.coroutines.launch
 fun MetadataEditScreen(
     track: Track,
     onClose: () -> Unit,
-    metadataWriteRequest: (Track) -> android.content.IntentSender?,
     writeMetadata: suspend (Track, TrackEdit) -> MetadataWriteResult,
 ) {
     val colors = NuvibeTheme.colors
@@ -94,13 +93,30 @@ fun MetadataEditScreen(
         genre = genre,
     )
 
-    fun handleResult(result: MetadataWriteResult, launchConsent: (android.content.IntentSender) -> Unit) {
-        when (result) {
-            is MetadataWriteResult.Success -> onClose()
-            is MetadataWriteResult.NeedsConsent -> launchConsent(result.intentSender)
-            is MetadataWriteResult.Error -> {
-                saving = false
-                message = result.message
+    // The launcher and the write reference each other, so park the "launch the
+    // consent prompt" action in a plain holder the write reads once it's set.
+    val launchConsent = remember { arrayOfNulls<(android.content.IntentSender) -> Unit>(1) }
+
+    // Try to write the tags. Scoped storage rejects the first attempt for files
+    // Nuvibe doesn't own, handing back a consent intent; we launch it and, once
+    // the user allows, retry with [afterConsent] set so a still-denied write ends
+    // in a clear error instead of silently looping.
+    fun attemptWrite(afterConsent: Boolean) {
+        scope.launch {
+            when (val result = writeMetadata(track, currentEdit())) {
+                is MetadataWriteResult.Success -> onClose()
+                is MetadataWriteResult.Error -> {
+                    saving = false
+                    message = result.message
+                }
+                is MetadataWriteResult.NeedsConsent -> {
+                    if (afterConsent) {
+                        saving = false
+                        message = "Nuvibe couldn't get permission to edit this file."
+                    } else {
+                        launchConsent[0]?.invoke(result.intentSender)
+                    }
+                }
             }
         }
     }
@@ -109,31 +125,22 @@ fun MetadataEditScreen(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            scope.launch {
-                // Consent granted — apply the edit for real.
-                handleResult(writeMetadata(track, currentEdit())) { }
-            }
+            // Consent granted — apply the edit for real.
+            attemptWrite(afterConsent = true)
         } else {
             saving = false
             message = "Editing needs your permission to change this file."
         }
+    }
+    launchConsent[0] = { sender ->
+        consentLauncher.launch(IntentSenderRequest.Builder(sender).build())
     }
 
     fun save() {
         if (saving) return
         saving = true
         message = null
-        val consent = metadataWriteRequest(track)
-        if (consent != null) {
-            // API 30+: ask up front, then write when the launcher returns OK.
-            consentLauncher.launch(IntentSenderRequest.Builder(consent).build())
-        } else {
-            scope.launch {
-                handleResult(writeMetadata(track, currentEdit())) { sender ->
-                    consentLauncher.launch(IntentSenderRequest.Builder(sender).build())
-                }
-            }
-        }
+        attemptWrite(afterConsent = false)
     }
 
     NuvibeBackground {

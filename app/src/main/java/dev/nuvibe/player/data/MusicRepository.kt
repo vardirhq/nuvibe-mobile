@@ -1,7 +1,6 @@
 package dev.nuvibe.player.data
 
 import android.content.Context
-import android.content.IntentSender
 import android.net.Uri
 import dev.nuvibe.player.data.mediastore.MediaStoreScanner
 import dev.nuvibe.player.data.mediastore.MetadataWriteResult
@@ -39,12 +38,6 @@ class MusicRepository(context: Context) {
         _library.value = scanner.scan()
         _scanState.value = ScanState.READY
     }
-
-    /**
-     * On API 30+, an [IntentSender] the caller must launch to get the user's
-     * consent before editing [uri]; null on older versions.
-     */
-    fun metadataWriteRequest(uri: Uri): IntentSender? = metadataWriter.createWriteRequest(uri)
 
     /** Writes [edit] to [uri], rescanning the library on success. */
     suspend fun writeMetadata(uri: Uri, edit: TrackEdit): MetadataWriteResult {
