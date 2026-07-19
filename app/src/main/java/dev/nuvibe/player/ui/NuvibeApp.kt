@@ -293,7 +293,6 @@ fun NuvibeApp(vm: NuvibeViewModel) {
                     MetadataEditScreen(
                         track = track,
                         onClose = { editTrack = null },
-                        metadataWriteRequest = vm::metadataWriteRequest,
                         writeMetadata = vm::writeMetadata,
                     )
                 }
