@@ -2,6 +2,7 @@ package dev.nuvibe.player.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,6 +48,7 @@ import dev.nuvibe.player.ui.player.TrackActionsSheet
 import dev.nuvibe.player.ui.screens.AlbumDetailScreen
 import dev.nuvibe.player.ui.screens.HomeScreen
 import dev.nuvibe.player.ui.screens.LibraryScreen
+import dev.nuvibe.player.ui.screens.MetadataEditScreen
 import dev.nuvibe.player.ui.screens.LibraryTab
 import dev.nuvibe.player.ui.screens.SearchScreen
 import dev.nuvibe.player.ui.screens.SettingsScreen
@@ -105,6 +107,20 @@ fun NuvibeApp(vm: NuvibeViewModel) {
         var showPlayer by remember { mutableStateOf(false) }
         var openAlbumId by remember { mutableStateOf<Long?>(null) }
         var actionsTrack by remember { mutableStateOf<Track?>(null) }
+        var editTrack by remember { mutableStateOf<Track?>(null) }
+
+        // Route the system/gesture back button through the in-app navigation
+        // stack instead of letting it close the app on the first press.
+        BackHandler(
+            enabled = editTrack != null || showPlayer || openAlbumId != null || tab != Tab.HOME,
+        ) {
+            when {
+                editTrack != null -> editTrack = null
+                showPlayer -> showPlayer = false
+                openAlbumId != null -> openAlbumId = null
+                tab != Tab.HOME -> tab = Tab.HOME
+            }
+        }
 
         // Resolve against the raw library so a currently-playing track keeps
         // showing even if the user has hidden it or its folder.
@@ -261,7 +277,26 @@ fun NuvibeApp(vm: NuvibeViewModel) {
                     onAddToPlaylist = { vm.addToPlaylist(it, listOf(track.id)) },
                     onCreatePlaylistWithTrack = { vm.createPlaylist(track.album, listOf(track.id)) },
                     onHideTrack = { vm.setTrackHidden(track.id, true) },
+                    onEditMetadata = { editTrack = track },
                 )
+            }
+
+            // Metadata editor (retain last track so the exit animation is smooth)
+            val editingTrack = remember { mutableStateOf<Track?>(null) }
+            LaunchedEffect(editTrack) { editTrack?.let { editingTrack.value = it } }
+            AnimatedVisibility(
+                visible = editTrack != null,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            ) {
+                editingTrack.value?.let { track ->
+                    MetadataEditScreen(
+                        track = track,
+                        onClose = { editTrack = null },
+                        metadataWriteRequest = vm::metadataWriteRequest,
+                        writeMetadata = vm::writeMetadata,
+                    )
+                }
             }
 
             // Splash

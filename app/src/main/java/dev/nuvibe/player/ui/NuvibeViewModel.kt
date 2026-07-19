@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import android.content.IntentSender
 import dev.nuvibe.player.NuvibeApplication
 import dev.nuvibe.player.data.MusicRepository
 import dev.nuvibe.player.data.PlaylistRepository
 import dev.nuvibe.player.data.ScanState
+import dev.nuvibe.player.data.mediastore.MetadataWriteResult
+import dev.nuvibe.player.data.mediastore.TrackEdit
 import dev.nuvibe.player.data.model.Album
 import dev.nuvibe.player.data.model.Library
 import dev.nuvibe.player.data.model.Playlist
@@ -133,6 +136,16 @@ class NuvibeViewModel(
 
     fun setTrackHidden(trackId: Long, hidden: Boolean) =
         viewModelScope.launch { settingsRepository.setTrackHidden(trackId, hidden) }
+
+    // ---- metadata ---------------------------------------------------------
+
+    /** API 30+ consent intent for editing [track]'s file, or null on older versions. */
+    fun metadataWriteRequest(track: Track): IntentSender? =
+        musicRepository.metadataWriteRequest(track.uri)
+
+    /** Writes edited tags for [track]; the library rescans on success. */
+    suspend fun writeMetadata(track: Track, edit: TrackEdit): MetadataWriteResult =
+        musicRepository.writeMetadata(track.uri, edit)
 
     // ---- playlists --------------------------------------------------------
 
