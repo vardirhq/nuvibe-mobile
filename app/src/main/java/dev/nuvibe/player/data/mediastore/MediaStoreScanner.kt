@@ -43,6 +43,7 @@ class MediaStoreScanner(private val context: Context) {
             MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.YEAR,
             MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DATA,
         )
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
@@ -60,6 +61,7 @@ class MediaStoreScanner(private val context: Context) {
             val trackCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
             val yearCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
             val dateCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+            val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
@@ -81,6 +83,7 @@ class MediaStoreScanner(private val context: Context) {
                     uri = ContentUris.withAppendedId(collection, id),
                     albumArtUri = ContentUris.withAppendedId(albumArtBase, albumId),
                     dateAddedSec = c.getLong(dateCol),
+                    folder = folderOf(c.getString(dataCol)),
                 )
             }
         }
@@ -124,4 +127,8 @@ class MediaStoreScanner(private val context: Context) {
     /** MediaStore uses "<unknown>" / blank for missing tags. */
     private fun String?.clean(fallback: String): String =
         if (this == null || isBlank() || this == "<unknown>") fallback else this
+
+    /** Parent directory of a track's absolute path (DATA), or "" if unknown. */
+    private fun folderOf(data: String?): String =
+        data?.substringBeforeLast('/', "")?.takeIf { it.isNotBlank() } ?: ""
 }

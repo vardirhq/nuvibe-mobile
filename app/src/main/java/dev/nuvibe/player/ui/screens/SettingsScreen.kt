@@ -1,6 +1,12 @@
 package dev.nuvibe.player.ui.screens
 
+import android.widget.Toast
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,15 +32,23 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.nuvibe.player.data.settings.AccentColor
@@ -50,6 +65,8 @@ import dev.nuvibe.player.ui.theme.color
 fun SettingsScreen(
     settings: AppSettings,
     songCount: Int,
+    isScanning: Boolean,
+    folders: List<Pair<String, Int>>,
     onSetTheme: (ThemeMode) -> Unit,
     onSetAccent: (AccentColor) -> Unit,
     onSetSkipSilence: (Boolean) -> Unit,
@@ -58,6 +75,8 @@ fun SettingsScreen(
     onRescan: () -> Unit,
 ) {
     val colors = NuvibeTheme.colors
+    val context = LocalContext.current
+    var showFolders by remember { mutableStateOf(false) }
     val dark = settings.themeMode == ThemeMode.DARK
 
     Column(
@@ -124,32 +143,63 @@ fun SettingsScreen(
         Spacer(Modifier.height(22.dp))
         OverlineLabel("Library", Modifier.padding(bottom = 11.dp))
         Card {
+            val spin = rememberInfiniteTransition(label = "rescan")
+            val angle by spin.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+                label = "rescanAngle",
+            )
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickableNoRipple(onRescan)
+                    .clickableNoRipple {
+                        if (!isScanning) {
+                            onRescan()
+                            Toast.makeText(context, "Rescanning your library…", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.Refresh, null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Rounded.Refresh, null,
+                    tint = colors.accent,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .then(if (isScanning) Modifier.rotate(angle) else Modifier),
+                )
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Rescan library", color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text("$songCount tracks indexed from this device", color = colors.text2, fontSize = 12.sp)
+                    Text(
+                        if (isScanning) "Scanning your device…" else "$songCount tracks indexed · tap to refresh",
+                        color = colors.text2,
+                        fontSize = 12.sp,
+                    )
                 }
             }
             Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(colors.border))
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .clickableNoRipple { if (folders.isNotEmpty()) showFolders = true }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Rounded.Folder, null, tint = colors.text2, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Music source", color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text("System media library (MediaStore)", color = colors.text2, fontSize = 12.sp)
+                    Text("Music folders", color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        when (folders.size) {
+                            0 -> "No folders indexed yet"
+                            1 -> "1 folder · tap to view"
+                            else -> "${folders.size} folders · tap to view"
+                        },
+                        color = colors.text2,
+                        fontSize = 12.sp,
+                    )
                 }
             }
         }
@@ -166,7 +216,65 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
     }
+
+    if (showFolders) {
+        FoldersDialog(folders = folders, onDismiss = { showFolders = false })
+    }
 }
+
+@Composable
+private fun FoldersDialog(folders: List<Pair<String, Int>>, onDismiss: () -> Unit) {
+    val colors = NuvibeTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Music folders") },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                folders.forEach { (path, count) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Folder, null, tint = colors.text3, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                path.substringAfterLast('/').ifBlank { path },
+                                color = colors.text,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                prettyPath(path),
+                                color = colors.text3,
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text("$count", color = colors.text2, fontSize = 13.sp)
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** Trim the storage-root prefix so folder paths read cleanly. */
+private fun prettyPath(path: String): String = path
+    .removePrefix("/storage/emulated/0/")
+    .removePrefix("/storage/")
+    .ifBlank { "Internal storage" }
 
 @Composable
 private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {

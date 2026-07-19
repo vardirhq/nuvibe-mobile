@@ -16,6 +16,7 @@ data class Track(
     val uri: Uri,
     val albumArtUri: Uri?,
     val dateAddedSec: Long,
+    val folder: String,
 ) {
     /** Stable key used as the MediaItem mediaId. */
     val mediaId: String get() = id.toString()
@@ -65,6 +66,14 @@ data class Library(
 ) {
     val byId: Map<Long, Track> = tracks.associateBy { it.id }
     val albumsById: Map<Long, Album> = albums.associateBy { it.id }
+
+    /** Distinct source folders with their track counts, most-populated first. */
+    val folders: List<Pair<String, Int>> = tracks
+        .filter { it.folder.isNotBlank() }
+        .groupingBy { it.folder }
+        .eachCount()
+        .toList()
+        .sortedByDescending { it.second }
 
     fun track(id: Long): Track? = byId[id]
     fun tracksFor(ids: List<Long>): List<Track> = ids.mapNotNull { byId[it] }
