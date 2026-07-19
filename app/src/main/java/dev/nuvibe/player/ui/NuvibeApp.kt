@@ -156,6 +156,8 @@ fun NuvibeApp(vm: NuvibeViewModel) {
                                 Tab.SETTINGS -> SettingsScreen(
                                     settings = settings,
                                     songCount = library.tracks.size,
+                                    isScanning = scanState == ScanState.SCANNING,
+                                    folders = library.folders,
                                     onSetTheme = vm::setTheme,
                                     onSetAccent = vm::setAccent,
                                     onSetSkipSilence = vm::setSkipSilence,
