@@ -1,7 +1,12 @@
 package dev.nuvibe.player.data
 
 import android.content.Context
+import android.content.IntentSender
+import android.net.Uri
 import dev.nuvibe.player.data.mediastore.MediaStoreScanner
+import dev.nuvibe.player.data.mediastore.MetadataWriteResult
+import dev.nuvibe.player.data.mediastore.MetadataWriter
+import dev.nuvibe.player.data.mediastore.TrackEdit
 import dev.nuvibe.player.data.model.Library
 import dev.nuvibe.player.data.model.SmartMix
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +25,7 @@ enum class ScanState { IDLE, SCANNING, READY }
 class MusicRepository(context: Context) {
 
     private val scanner = MediaStoreScanner(context.applicationContext)
+    private val metadataWriter = MetadataWriter(context.applicationContext)
     private val scanMutex = Mutex()
 
     private val _library = MutableStateFlow(Library())
@@ -32,6 +38,19 @@ class MusicRepository(context: Context) {
         _scanState.value = ScanState.SCANNING
         _library.value = scanner.scan()
         _scanState.value = ScanState.READY
+    }
+
+    /**
+     * On API 30+, an [IntentSender] the caller must launch to get the user's
+     * consent before editing [uri]; null on older versions.
+     */
+    fun metadataWriteRequest(uri: Uri): IntentSender? = metadataWriter.createWriteRequest(uri)
+
+    /** Writes [edit] to [uri], rescanning the library on success. */
+    suspend fun writeMetadata(uri: Uri, edit: TrackEdit): MetadataWriteResult {
+        val result = metadataWriter.write(uri, edit)
+        if (result is MetadataWriteResult.Success) refresh()
+        return result
     }
 
     /** Deterministic "smart" mixes derived from the current library. */

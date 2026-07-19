@@ -1,6 +1,8 @@
 package dev.nuvibe.player.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +49,7 @@ import dev.nuvibe.player.ui.theme.Display
 import dev.nuvibe.player.ui.theme.NuvibeTheme
 import dev.nuvibe.player.ui.util.formatDuration
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumDetailScreen(
     album: Album,
@@ -139,7 +142,10 @@ fun AlbumDetailScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickableNoRipple { onPlayTrack(track) }
+                        .combinedClickable(
+                            onClick = { onPlayTrack(track) },
+                            onLongClick = { onTrackLongPress(track) },
+                        )
                         .padding(horizontal = 20.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

@@ -17,6 +17,8 @@ data class Track(
     val albumArtUri: Uri?,
     val dateAddedSec: Long,
     val folder: String,
+    val albumArtist: String = "",
+    val genre: String = "",
 ) {
     /** Stable key used as the MediaItem mediaId. */
     val mediaId: String get() = id.toString()

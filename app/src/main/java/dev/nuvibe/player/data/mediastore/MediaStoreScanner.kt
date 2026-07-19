@@ -29,18 +29,24 @@ class MediaStoreScanner(private val context: Context) {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
 
-        val projection = arrayOf(
-            MediaStore.Audio.Media._ID,
-            MediaStore.Audio.Media.TITLE,
-            MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.ALBUM,
-            MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.TRACK,
-            MediaStore.Audio.Media.YEAR,
-            MediaStore.Audio.Media.DATE_ADDED,
-            MediaStore.Audio.Media.DATA,
-        )
+        // ALBUM_ARTIST and GENRE are only exposed as columns from API 30 onwards.
+        val hasExtendedTags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R
+        val projection = buildList {
+            add(MediaStore.Audio.Media._ID)
+            add(MediaStore.Audio.Media.TITLE)
+            add(MediaStore.Audio.Media.ARTIST)
+            add(MediaStore.Audio.Media.ALBUM)
+            add(MediaStore.Audio.Media.ALBUM_ID)
+            add(MediaStore.Audio.Media.DURATION)
+            add(MediaStore.Audio.Media.TRACK)
+            add(MediaStore.Audio.Media.YEAR)
+            add(MediaStore.Audio.Media.DATE_ADDED)
+            add(MediaStore.Audio.Media.DATA)
+            if (hasExtendedTags) {
+                add(MediaStore.Audio.Media.ALBUM_ARTIST)
+                add(MediaStore.Audio.Media.GENRE)
+            }
+        }.toTypedArray()
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
             "${MediaStore.Audio.Media.DURATION} > 5000"
@@ -58,6 +64,8 @@ class MediaStoreScanner(private val context: Context) {
             val yearCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
             val dateCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
             val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            val albumArtistCol = if (hasExtendedTags) c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ARTIST) else -1
+            val genreCol = if (hasExtendedTags) c.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
 
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
@@ -80,6 +88,8 @@ class MediaStoreScanner(private val context: Context) {
                     albumArtUri = ContentUris.withAppendedId(albumArtBase, albumId),
                     dateAddedSec = c.getLong(dateCol),
                     folder = folderOf(c.getString(dataCol)),
+                    albumArtist = if (albumArtistCol >= 0 && !c.isNull(albumArtistCol)) c.getString(albumArtistCol).orEmpty() else "",
+                    genre = if (genreCol >= 0 && !c.isNull(genreCol)) c.getString(genreCol).orEmpty() else "",
                 )
             }
         }
