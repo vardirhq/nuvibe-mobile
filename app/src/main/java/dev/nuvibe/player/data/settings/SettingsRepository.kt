@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -25,6 +26,8 @@ class SettingsRepository(private val context: Context) {
         val LAST_TRACK = longPreferencesKey("last_track_id")
         val LAST_POSITION = longPreferencesKey("last_position_ms")
         val RECENT_ALBUMS = stringPreferencesKey("recent_album_ids")
+        val HIDDEN_FOLDERS = stringSetPreferencesKey("hidden_folders")
+        val HIDDEN_TRACKS = stringSetPreferencesKey("hidden_track_ids")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -43,11 +46,30 @@ class SettingsRepository(private val context: Context) {
         p[Keys.RECENT_ALBUMS]?.split(',')?.mapNotNull { it.toLongOrNull() } ?: emptyList()
     }
 
+    /** Folders the user has switched off; their tracks are hidden from the library. */
+    val hiddenFolders: Flow<Set<String>> = context.dataStore.data.map { it[Keys.HIDDEN_FOLDERS] ?: emptySet() }
+
+    /** Individual tracks the user has hidden from the UI. */
+    val hiddenTrackIds: Flow<Set<Long>> = context.dataStore.data.map { p ->
+        p[Keys.HIDDEN_TRACKS]?.mapNotNull { it.toLongOrNull() }?.toSet() ?: emptySet()
+    }
+
     suspend fun setTheme(mode: ThemeMode) = context.dataStore.edit { it[Keys.THEME] = mode.name }
     suspend fun setAccent(accent: AccentColor) = context.dataStore.edit { it[Keys.ACCENT] = accent.name }
     suspend fun setSkipSilence(value: Boolean) = context.dataStore.edit { it[Keys.SKIP_SILENCE] = value }
     suspend fun setPauseOnDisconnect(value: Boolean) = context.dataStore.edit { it[Keys.PAUSE_DISCONNECT] = value }
     suspend fun setHandleAudioFocus(value: Boolean) = context.dataStore.edit { it[Keys.AUDIO_FOCUS] = value }
+
+    suspend fun setFolderHidden(path: String, hidden: Boolean) = context.dataStore.edit { p ->
+        val current = p[Keys.HIDDEN_FOLDERS] ?: emptySet()
+        p[Keys.HIDDEN_FOLDERS] = if (hidden) current + path else current - path
+    }
+
+    suspend fun setTrackHidden(trackId: Long, hidden: Boolean) = context.dataStore.edit { p ->
+        val current = p[Keys.HIDDEN_TRACKS] ?: emptySet()
+        val key = trackId.toString()
+        p[Keys.HIDDEN_TRACKS] = if (hidden) current + key else current - key
+    }
 
     suspend fun saveNowPlaying(trackId: Long, positionMs: Long) = context.dataStore.edit {
         it[Keys.LAST_TRACK] = trackId

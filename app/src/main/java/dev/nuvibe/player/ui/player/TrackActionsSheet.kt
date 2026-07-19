@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -51,6 +52,7 @@ fun TrackActionsSheet(
     onGoToAlbum: () -> Unit,
     onAddToPlaylist: (Long) -> Unit,
     onCreatePlaylistWithTrack: () -> Unit,
+    onHideTrack: () -> Unit,
 ) {
     val colors = NuvibeTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -78,6 +80,7 @@ fun TrackActionsSheet(
                 ActionItem(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { onAddToQueue(); onDismiss() }
                 ActionItem(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist") { picking = true }
                 ActionItem(Icons.Rounded.Album, "Go to album") { onGoToAlbum(); onDismiss() }
+                ActionItem(Icons.Rounded.VisibilityOff, "Hide track") { onHideTrack(); onDismiss() }
             } else {
                 Text("Add to playlist", color = colors.text3, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
                 ActionItem(Icons.Rounded.Add, "New playlist with this song") { onCreatePlaylistWithTrack(); onDismiss() }

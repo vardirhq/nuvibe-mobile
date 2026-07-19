@@ -72,6 +72,9 @@ fun NuvibeApp(vm: NuvibeViewModel) {
         }
 
         val library by vm.library.collectAsStateWithLifecycle()
+        val rawLibrary by vm.rawLibrary.collectAsStateWithLifecycle()
+        val hiddenFolders by vm.hiddenFolders.collectAsStateWithLifecycle()
+        val hiddenTrackIds by vm.hiddenTrackIds.collectAsStateWithLifecycle()
         val scanState by vm.scanState.collectAsStateWithLifecycle()
         val playerState by vm.playerState.collectAsStateWithLifecycle()
         val playlists by vm.playlists.collectAsStateWithLifecycle()
@@ -103,7 +106,9 @@ fun NuvibeApp(vm: NuvibeViewModel) {
         var openAlbumId by remember { mutableStateOf<Long?>(null) }
         var actionsTrack by remember { mutableStateOf<Track?>(null) }
 
-        val currentTrack = playerState.currentTrackId?.let { library.track(it) }
+        // Resolve against the raw library so a currently-playing track keeps
+        // showing even if the user has hidden it or its folder.
+        val currentTrack = playerState.currentTrackId?.let { library.track(it) ?: rawLibrary.track(it) }
         val smartMixes = remember(library) { vm.smartMixes(library) }
         val recentAlbums = remember(recentAlbumIds, library) {
             val fromHistory = recentAlbumIds.mapNotNull { library.albumsById[it] }
@@ -157,12 +162,16 @@ fun NuvibeApp(vm: NuvibeViewModel) {
                                     settings = settings,
                                     songCount = library.tracks.size,
                                     isScanning = scanState == ScanState.SCANNING,
-                                    folders = library.folders,
+                                    folders = rawLibrary.folders,
+                                    hiddenFolders = hiddenFolders,
+                                    hiddenTracks = rawLibrary.tracksFor(hiddenTrackIds.toList()),
                                     onSetTheme = vm::setTheme,
                                     onSetAccent = vm::setAccent,
                                     onSetSkipSilence = vm::setSkipSilence,
                                     onSetPauseOnDisconnect = vm::setPauseOnDisconnect,
                                     onSetHandleAudioFocus = vm::setHandleAudioFocus,
+                                    onSetFolderHidden = vm::setFolderHidden,
+                                    onUnhideTrack = { vm.setTrackHidden(it, false) },
                                     onRescan = vm::rescan,
                                 )
                             }
@@ -251,6 +260,7 @@ fun NuvibeApp(vm: NuvibeViewModel) {
                     onGoToAlbum = { openAlbumId = track.albumId },
                     onAddToPlaylist = { vm.addToPlaylist(it, listOf(track.id)) },
                     onCreatePlaylistWithTrack = { vm.createPlaylist(track.album, listOf(track.id)) },
+                    onHideTrack = { vm.setTrackHidden(track.id, true) },
                 )
             }
 
